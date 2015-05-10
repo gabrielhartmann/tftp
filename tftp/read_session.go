@@ -1,0 +1,203 @@
+package tftp
+
+import (
+	"errors"
+	"fmt"
+	"net"
+
+	"github.com/Sirupsen/logrus"
+	. "github.com/gabrielhartmann/tftp/fileserv"
+)
+
+type ReadSession struct {
+	writer       *TftpReaderWriter
+	file         *File
+	currBlock    uint16
+	lastBlock    int
+	fileComplete bool
+	timeoutCount int
+}
+
+func StartNewReadSession(remoteAddr *net.UDPAddr, fileName string, fileServ FileServer) error {
+	// Create TftpReaderWriter
+	writer, err := NewTftpReaderWriter(remoteAddr, true)
+	if err != nil {
+		return err
+	}
+
+	if !fileServ.FileExists(fileName) {
+		return HandleError(writer, FileNotFound, fmt.Sprintf("File '%v' doesn't exist", fileName))
+	}
+
+	file, err := fileServ.Read(fileName)
+	if err != nil {
+		return err
+	}
+
+	// Set the last block we expect to receive an ACK for.
+	// In the case of empty files we still need to transmit one block
+	// hence the lastBlock == 0, case
+	lastBlock := (len(file.Data) / dataBlockSize)
+	if lastBlock*dataBlockSize < len(file.Data) || lastBlock == 0 {
+		lastBlock++
+	}
+
+	readSession := &ReadSession{
+		writer:       writer,
+		file:         file,
+		currBlock:    1,
+		lastBlock:    lastBlock,
+		fileComplete: false,
+		timeoutCount: 0,
+	}
+
+	logrus.Infof("[Read Session %v]: Start for file '%v'", remoteAddr.Port, file.Name)
+
+	// Main work loop with bounded timeouts
+	for readSession.timeoutCount < timeoutCountMax {
+		if err = readSession.Start(); err != nil {
+			if isTimeout(err) {
+				logrus.Infof("[Read Session %v]: timeout %d", remoteAddr.Port, readSession.timeoutCount)
+				readSession.timeoutCount++
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (s *ReadSession) Start() error {
+	// Write initial data packet
+	s.writeData()
+
+	// Read packets continuously until the last packet is ACKed.
+	// See the ACK() method below
+	for {
+		if s.fileComplete {
+			logrus.Infof("[Read Session]: completed file '%v' with %v bytes", s.file.Name, len(s.file.Data))
+			return nil
+		}
+
+		if bytes, _, err := s.writer.Read(); err != nil {
+			return err
+		} else {
+			if err := s.handleTftpPackets(bytes); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// This function determines the type of a packet and routes it to the
+// appropriate handling method
+func (s *ReadSession) handleTftpPackets(input []byte) error {
+	code, err := getOpcode(input)
+	if err != nil {
+		return err
+	}
+
+	switch code {
+	case RRQ:
+		if file, mode, err := parseRequest(input[2:]); err == nil {
+			return s.ReadReq(file, mode)
+		} else {
+			return err
+		}
+	case WRQ:
+		if file, mode, err := parseRequest(input[2:]); err == nil {
+			return s.WriteReq(file, mode)
+		} else {
+			return err
+		}
+	case DATA:
+		if block, data, err := parseData(input[2:]); err == nil {
+			return s.Data(block, data)
+		} else {
+			return err
+		}
+	case ACK:
+		if block, err := parseAck(input[2:]); err == nil {
+			return s.Ack(block)
+		} else {
+			return err
+		}
+	case ERROR:
+		if code, msg, err := parseError(input[2:]); err == nil {
+			return s.Err(code, msg)
+		} else {
+			return err
+		}
+	}
+
+	return errors.New("We should never reach the end of ParseTftpPackets")
+}
+
+// Get the next block of data from the file depending
+// on the current block ID
+func (s *ReadSession) getData() []byte {
+	// Blocks are 1 indexed
+	currBlock32 := int(s.currBlock)
+	start := (currBlock32 - 1) * dataBlockSize
+	if start >= len(s.file.Data) {
+		return []byte{}
+	}
+
+	end := start + dataBlockSize
+	if len(s.file.Data) <= end {
+		return s.file.Data[start:]
+	}
+
+	return s.file.Data[start:end]
+}
+
+// Build the next Data packet for transmission
+func (s *ReadSession) getDataPacket() (*DataPacket, error) {
+	if bytes, err := convertIntToBytes(s.currBlock); err != nil {
+		return nil, err
+	} else {
+		data := s.getData()
+		blockArr := [2]byte{bytes[0], bytes[1]}
+		return NewDataPacket(blockArr, data), nil
+	}
+}
+
+// Send the nex data packet to the requestor
+func (s *ReadSession) writeData() error {
+	if data, err := s.getDataPacket(); err != nil {
+		return err
+	} else {
+		_, err = s.writer.Write(data.bytes)
+		return err
+	}
+}
+
+func (s *ReadSession) ReadReq(file string, mode string) error {
+	return errors.New("ReadReq operations are not supported on read handlers")
+}
+
+func (s *ReadSession) WriteReq(file string, mode string) error {
+	return errors.New("WriteReq operations are not supported on read handlers")
+}
+
+func (s *ReadSession) Data(block uint16, data []byte) error {
+	return errors.New("Data operations are not supported on read handlers")
+}
+
+func (s *ReadSession) Ack(block uint16) error {
+	if int(block) == s.lastBlock {
+		s.fileComplete = true
+		return nil
+	}
+
+	s.currBlock++
+	return s.writeData()
+}
+
+func (s *ReadSession) Err(code uint16, msg string) error {
+	logrus.Infof("Received Error with code %v and message %v", code, msg)
+	return errors.New(fmt.Sprintf("Received Error with code %v and message %v", code, msg))
+}
