@@ -121,7 +121,7 @@ func (s *ReadSession) getDataPacket() (*DataPacket, error) {
 	}
 }
 
-// Send the nex data packet to the requestor
+// Send the next data packet to the requestor
 func (s *ReadSession) writeData() error {
 	if data, err := s.getDataPacket(); err != nil {
 		return err

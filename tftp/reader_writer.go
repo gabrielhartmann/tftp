@@ -14,8 +14,6 @@ type TftpReaderWriter struct {
 	timeout   bool
 }
 
-const timeoutSec = 3
-
 func NewTftpReaderWriter(remoteAddr *net.UDPAddr, timeout bool) (*TftpReaderWriter, error) {
 	// Resolve UDP address
 	localAddr, err := net.ResolveUDPAddr("udp", ":0")
@@ -77,6 +75,6 @@ func (rw *TftpReaderWriter) Read() ([]byte, *net.UDPAddr, error) {
 
 func (rw *TftpReaderWriter) setDeadline() {
 	if rw.timeout {
-		rw.conn.SetDeadline(time.Now().Add(3 * time.Second))
+		rw.conn.SetDeadline(time.Now().Add(timeoutSec * time.Second))
 	}
 }

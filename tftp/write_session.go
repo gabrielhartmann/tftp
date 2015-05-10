@@ -44,7 +44,7 @@ func StartNewWriteSession(remoteAddr *net.UDPAddr, file string, fileServ FileSer
 
 	logrus.Infof("[Write Session %v]: Start for file '%v'", remoteAddr.Port, file)
 
-	// Main work floop with bounded timeouts
+	// Main work loop with bounded timeouts
 	for writeSession.timeoutCount < timeoutCountMax {
 		if err = writeSession.Start(); err != nil {
 			if isTimeout(err) {

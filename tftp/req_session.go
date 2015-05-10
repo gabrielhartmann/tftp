@@ -84,9 +84,9 @@ func (s *ReqSession) handleTftpPackets(addr *net.UDPAddr, input []byte) error {
 		} else {
 			return err
 		}
+	default:
+		return errors.New("We should never reach the end of request session's handleTftpPackets")
 	}
-
-	return errors.New("We should never reach the end of ParseTftpPackets")
 }
 
 func (s *ReqSession) ReadReq(addr *net.UDPAddr, file string, mode string) error {
