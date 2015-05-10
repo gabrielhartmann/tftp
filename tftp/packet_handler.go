@@ -52,6 +52,6 @@ func HandleTftpPackets(handler PacketHandler, input []byte) error {
 			return err
 		}
 	default:
-		return errors.New("We should never reach the end of ParseTftpPackets")
+		return errors.New("We should never reach the end of HandleTftpPackets")
 	}
 }
