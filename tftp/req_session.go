@@ -39,53 +39,10 @@ func (s *ReqSession) Start() error {
 		if bytes, addr, err := s.rw.Read(); err != nil {
 			return err
 		} else {
-			if err := s.handleTftpPackets(addr, bytes); err != nil {
+			if err := HandleTftpPackets(s, addr, bytes); err != nil {
 				return err
 			}
 		}
-	}
-}
-
-// Routes tftp packets to the appropriate handlers below
-func (s *ReqSession) handleTftpPackets(addr *net.UDPAddr, input []byte) error {
-	code, err := getOpcode(input)
-	if err != nil {
-		return err
-	}
-
-	switch code {
-	case RRQ:
-		if file, mode, err := parseRequest(input[2:]); err == nil {
-			return s.ReadReq(addr, file, mode)
-		} else {
-			return err
-		}
-	case WRQ:
-		if file, mode, err := parseRequest(input[2:]); err == nil {
-			return s.WriteReq(addr, file, mode)
-		} else {
-			return err
-		}
-	case DATA:
-		if block, data, err := parseData(input[2:]); err == nil {
-			return s.Data(block, data)
-		} else {
-			return err
-		}
-	case ACK:
-		if block, err := parseAck(input[2:]); err == nil {
-			return s.Ack(block)
-		} else {
-			return err
-		}
-	case ERROR:
-		if code, msg, err := parseError(input[2:]); err == nil {
-			return s.Err(code, msg)
-		} else {
-			return err
-		}
-	default:
-		return errors.New("We should never reach the end of request session's handleTftpPackets")
 	}
 }
 

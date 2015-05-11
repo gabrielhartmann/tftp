@@ -10,7 +10,7 @@ import (
 )
 
 type ReadSession struct {
-	writer       *TftpReaderWriter
+	rw           *TftpReaderWriter
 	file         *File
 	currBlock    uint16
 	lastBlock    int
@@ -20,13 +20,13 @@ type ReadSession struct {
 
 func StartNewReadSession(remoteAddr *net.UDPAddr, fileName string, fileServ FileServer) error {
 	// Create TftpReaderWriter
-	writer, err := NewTftpReaderWriter(remoteAddr, true)
+	rw, err := NewTftpReaderWriter(remoteAddr, true)
 	if err != nil {
 		return err
 	}
 
 	if !fileServ.FileExists(fileName) {
-		return HandleError(writer, FileNotFound, fmt.Sprintf("File '%v' doesn't exist", fileName))
+		return HandleError(rw, FileNotFound, fmt.Sprintf("File '%v' doesn't exist", fileName))
 	}
 
 	file, err := fileServ.Read(fileName)
@@ -43,7 +43,7 @@ func StartNewReadSession(remoteAddr *net.UDPAddr, fileName string, fileServ File
 	}
 
 	readSession := &ReadSession{
-		writer:       writer,
+		rw:           rw,
 		file:         file,
 		currBlock:    1,
 		lastBlock:    lastBlock,
@@ -82,10 +82,10 @@ func (s *ReadSession) Start() error {
 			return nil
 		}
 
-		if bytes, _, err := s.writer.Read(); err != nil {
+		if bytes, _, err := s.rw.Read(); err != nil {
 			return err
 		} else {
-			if err := HandleTftpPackets(s, bytes); err != nil {
+			if err := HandleTftpPackets(s, s.rw.remoteAddr, bytes); err != nil {
 				return err
 			}
 		}
@@ -126,16 +126,16 @@ func (s *ReadSession) writeData() error {
 	if data, err := s.getDataPacket(); err != nil {
 		return err
 	} else {
-		_, err = s.writer.Write(data.bytes)
+		_, err = s.rw.Write(data.bytes)
 		return err
 	}
 }
 
-func (s *ReadSession) ReadReq(file string, mode string) error {
+func (s *ReadSession) ReadReq(addr *net.UDPAddr, file string, mode string) error {
 	return errors.New("ReadReq operations are not supported on read handlers")
 }
 
-func (s *ReadSession) WriteReq(file string, mode string) error {
+func (s *ReadSession) WriteReq(addr *net.UDPAddr, file string, mode string) error {
 	return errors.New("WriteReq operations are not supported on read handlers")
 }
 
