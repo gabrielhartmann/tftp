@@ -10,7 +10,7 @@ import (
 )
 
 type WriteSession struct {
-	writer       *TftpReaderWriter
+	rw           *TftpReaderWriter
 	fileServ     FileServer
 	block        uint16
 	fileName     string
@@ -23,17 +23,17 @@ var logPrefix string
 
 func StartNewWriteSession(remoteAddr *net.UDPAddr, file string, fileServ FileServer) error {
 	// Create TftpReaderWriter
-	writer, err := NewTftpReaderWriter(remoteAddr, true)
+	rw, err := NewTftpReaderWriter(remoteAddr, true)
 	if err != nil {
 		return err
 	}
 
 	if fileServ.FileExists(file) {
-		return HandleError(writer, FileExists, fmt.Sprintf("File '%v' already exists", file))
+		return HandleError(rw, FileExists, fmt.Sprintf("File '%v' already exists", file))
 	}
 
 	writeSession := &WriteSession{
-		writer:       writer,
+		rw:           rw,
 		fileServ:     fileServ,
 		block:        0,
 		fileName:     file,
@@ -76,10 +76,10 @@ func (s *WriteSession) Start() error {
 			return nil
 		}
 
-		if bytes, _, err := s.writer.Read(); err != nil {
+		if bytes, _, err := s.rw.Read(); err != nil {
 			return err
 		} else {
-			if err := HandleTftpPackets(s, bytes); err != nil {
+			if err := HandleTftpPackets(s, s.rw.remoteAddr, bytes); err != nil {
 				return err
 			}
 		}
@@ -106,16 +106,16 @@ func (s *WriteSession) writeAck() error {
 	if ack, err := s.getAckPacket(); err != nil {
 		return err
 	} else {
-		_, err = s.writer.Write(ack.bytes)
+		_, err = s.rw.Write(ack.bytes)
 		return err
 	}
 }
 
-func (s *WriteSession) ReadReq(file string, mode string) error {
+func (s *WriteSession) ReadReq(addr *net.UDPAddr, file string, mode string) error {
 	return errors.New("ReadReq operations are not supported on read handlers")
 }
 
-func (s *WriteSession) WriteReq(file string, mode string) error {
+func (s *WriteSession) WriteReq(addr *net.UDPAddr, file string, mode string) error {
 	return errors.New("WriteReq operations are not supported on read handlers")
 }
 

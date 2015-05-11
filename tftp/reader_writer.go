@@ -8,10 +8,11 @@ import (
 )
 
 type TftpReaderWriter struct {
-	buf       []byte
-	conn      *net.UDPConn
-	localAddr *net.UDPAddr
-	timeout   bool
+	buf        []byte
+	conn       *net.UDPConn
+	localAddr  *net.UDPAddr
+	remoteAddr *net.UDPAddr
+	timeout    bool
 }
 
 func NewTftpReaderWriter(remoteAddr *net.UDPAddr, timeout bool) (*TftpReaderWriter, error) {
@@ -42,10 +43,11 @@ func NewTftpReaderWriter(remoteAddr *net.UDPAddr, timeout bool) (*TftpReaderWrit
 	}
 
 	writer := &TftpReaderWriter{
-		conn:      conn,
-		buf:       make([]byte, 1024),
-		localAddr: localAddr,
-		timeout:   timeout,
+		conn:       conn,
+		buf:        make([]byte, 1024),
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
+		timeout:    timeout,
 	}
 
 	return writer, nil

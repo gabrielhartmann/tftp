@@ -1,5 +1,7 @@
 # In Memory TFTP Server
 
+![alt tag](https://raw.github.com/gabrielhartmann/tftp/master/tftp_demo.gif)
+
 To run the TFTP server:
 
 ```go

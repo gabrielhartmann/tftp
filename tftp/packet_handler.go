@@ -2,11 +2,12 @@ package tftp
 
 import (
 	"errors"
+	"net"
 )
 
 type PacketHandler interface {
-	ReadReq(file string, mode string) error
-	WriteReq(file string, mode string) error
+	ReadReq(addr *net.UDPAddr, file string, mode string) error
+	WriteReq(addr *net.UDPAddr, file string, mode string) error
 	Data(block uint16, data []byte) error
 	Ack(block uint16) error
 	Err(code uint16, msg string) error
@@ -14,7 +15,7 @@ type PacketHandler interface {
 
 // This function determines the type of a packet and routes it to the
 // appropriate handling method
-func HandleTftpPackets(handler PacketHandler, input []byte) error {
+func HandleTftpPackets(handler PacketHandler, addr *net.UDPAddr, input []byte) error {
 	code, err := getOpcode(input)
 	if err != nil {
 		return err
@@ -23,13 +24,13 @@ func HandleTftpPackets(handler PacketHandler, input []byte) error {
 	switch code {
 	case RRQ:
 		if file, mode, err := parseRequest(input[2:]); err == nil {
-			return handler.ReadReq(file, mode)
+			return handler.ReadReq(addr, file, mode)
 		} else {
 			return err
 		}
 	case WRQ:
 		if file, mode, err := parseRequest(input[2:]); err == nil {
-			return handler.WriteReq(file, mode)
+			return handler.WriteReq(addr, file, mode)
 		} else {
 			return err
 		}
