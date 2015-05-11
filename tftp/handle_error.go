@@ -2,6 +2,8 @@ package tftp
 
 import (
 	"errors"
+	"net"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -28,4 +30,9 @@ func HandleError(writer *TftpReaderWriter, code uint16, msg string) error {
 	logrus.Infof("Sending error packet: code: %v, msg: %v", errorPacket.code, errorPacket.msg)
 	writer.Write(errorPacket.bytes)
 	return errors.New(msg)
+}
+
+func isTimeout(err error) bool {
+	e, ok := err.(net.Error)
+	return ok && e.Timeout()
 }

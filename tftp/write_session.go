@@ -86,11 +86,6 @@ func (s *WriteSession) Start() error {
 	}
 }
 
-func isTimeout(err error) bool {
-	e, ok := err.(net.Error)
-	return ok && e.Timeout()
-}
-
 // Generate the next ACK packet
 func (s *WriteSession) getAckPacket() (*AckPacket, error) {
 	if bytes, err := convertIntToBytes(s.block); err != nil {
